@@ -1,0 +1,44 @@
+name: "update"
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 12 1 * *'
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install make dependency
+        run: |
+          sudo apt install -y unzip libime-bin
+
+      - name: Update dict source file
+        run: |
+          cd ${{ github.workspace }}/extern
+          if [[ -f "cedict_ts.u8" ]]; then
+            rm -f cedict_ts.u8
+          fi
+          wget https://www.mdbg.net/chinese/export/cedict/cedict_1_0_ts_utf-8_mdbg.zip
+          unzip cedict_1_0_ts_utf-8_mdbg.zip
+          cd ..
+          python main.py
+
+      - name: Generate release info
+        run: |
+          echo "NOW=$(date +'%Y%m%d')" >> $GITHUB_ENV
+          SHA256SUM="$(sha256sum dict/cedict.dict)"
+          echo "BODY=$SHA256SUM" >> $GITHUB_ENV
+ 
+      - name: Upload dict file
+        uses: softprops/action-gh-release@v1
+        with:
+          files: ${{ github.workspace }}/dict/cedict.dict
+          tag_name: ${{ env.NOW }}
+          body: ${{ env.BODY }}
+          name: cedict
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
